@@ -41,16 +41,18 @@ def load_ply_data(path, max_sh_degree=3):
 
         features_extra = features_extra.reshape((features_extra.shape[0], 3, (max_sh_degree + 1) ** 2 - 1))
 
-        features_all = torch.cat((torch.tensor(features_dc, device="cuda:0"), torch.tensor(features_extra, device="cuda:0")), 2)
+        features_dc_tensor = torch.from_numpy(features_dc.astype(np.float32)).to("cuda:0")
+        features_extra_tensor = torch.from_numpy(features_extra.astype(np.float32)).to("cuda:0")
+        features_all = torch.cat((features_dc_tensor, features_extra_tensor), 2)
 
         colours = computeColorFromLowDegSH(features_all)
     
     elif "red" in plydata.elements[0]:
 
         colours = torch.zeros((xyz.shape[0], 3), device="cuda:0", dtype=torch.double)
-        colours[:, 0] = torch.tensor(plydata.elements[0]["red"], device="cuda:0", dtype=torch.double)
-        colours[:, 1] = torch.tensor(plydata.elements[0]["green"], device="cuda:0", dtype=torch.double)
-        colours[:, 2] = torch.tensor(plydata.elements[0]["blue"], device="cuda:0", dtype=torch.double)
+        colours[:, 0] = torch.from_numpy(plydata.elements[0]["red"].astype(np.float64)).to("cuda:0")
+        colours[:, 1] = torch.from_numpy(plydata.elements[0]["green"].astype(np.float64)).to("cuda:0")
+        colours[:, 2] = torch.from_numpy(plydata.elements[0]["blue"].astype(np.float64)).to("cuda:0")
 
         if torch.count_nonzero(colours > 1.0) > 0:
             colours /= 255
@@ -73,11 +75,15 @@ def load_ply_data(path, max_sh_degree=3):
     for idx, attr_name in enumerate(rot_names):
         rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
-    opacities = (1 / (1 + torch.exp(torch.tensor(-opacities, device="cuda:0")))).type(torch.float).squeeze(1) # torch.full(opacities.shape, 0.05, device="cuda:0")-
+    opacities_tensor = torch.from_numpy(opacities.astype(np.float32)).to("cuda:0")
+    opacities = (1 / (1 + torch.exp(-opacities_tensor))).type(torch.float).squeeze(1)
 
-    xyz_tensor = torch.tensor(xyz, device="cuda:0")
-    scales_tensor = torch.tensor(scales, device="cuda:0")
-    rots_tensor = torch.tensor(rots/np.expand_dims(np.linalg.norm(rots, axis=1), 1), device="cuda:0") 
+    xyz_tensor = torch.from_numpy(xyz.astype(np.float32)).to("cuda:0")
+    scales_tensor = torch.from_numpy(scales.astype(np.float32)).to("cuda:0")
+    norm = np.expand_dims(np.linalg.norm(rots, axis=1), 1)
+    # Avoid division by zero
+    norm[norm == 0] = 1.0
+    rots_tensor = torch.from_numpy((rots / norm).astype(np.float32)).to("cuda:0")
 
     return xyz_tensor, scales_tensor, rots_tensor, colours, opacities, features_all
 
@@ -105,12 +111,12 @@ def load_splat_data(path):
     colours = data_array['colour']
     rots = data_array['rots']
     
-    xyz_tensor = torch.tensor(xyz, device="cuda:0")
-    scales_tensor = torch.tensor(np.log(scales), device="cuda:0")
-    colours_tensor = torch.tensor(colours[:, :3] / 255, device="cuda:0")
-    opacities = torch.tensor(colours[:, 3] / 255, device="cuda:0")
+    xyz_tensor = torch.from_numpy(xyz.astype(np.float32)).to("cuda:0")
+    scales_tensor = torch.from_numpy(np.log(scales + 1e-10).astype(np.float32)).to("cuda:0")
+    colours_tensor = torch.from_numpy((colours[:, :3] / 255.0).astype(np.float32)).to("cuda:0")
+    opacities = torch.from_numpy((colours[:, 3] / 255.0).astype(np.float32)).to("cuda:0")
     
-    rots_tensor = torch.tensor((rots.astype(np.float32) - 128) / 128, device="cuda:0")
+    rots_tensor = torch.from_numpy(((rots.astype(np.float32) - 128) / 128).astype(np.float32)).to("cuda:0")
     
     return xyz_tensor, scales_tensor, rots_tensor, colours_tensor, opacities, None
 
