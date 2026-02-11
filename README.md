@@ -17,12 +17,59 @@ This repo offers scripts for converting a 3D Gaussian Splatting scene into a den
 
 Credit [3D Gaussian Splatting](https://github.com/graphdeco-inria/gaussian-splatting) and [Torch Splatting](https://github.com/hbb1/torch-splatting/tree/main), which were both used as part of this codebase.
 
+## Fork Notice (YHZN-REPOS)
+
+This repository is maintained as a fork/integration copy for the SDK project:
+
+- **Original upstream project**: `Lewis-Stuart-11/3DGS-to-PC`
+  - https://github.com/Lewis-Stuart-11/3DGS-to-PC
+- **Current maintained fork**: `YHZN-REPOS/3DGS-to-PC`
+  - https://github.com/YHZN-REPOS/3DGS-to-PC
+- **Branch policy**: only `main` is maintained.
+
+### What is changed vs upstream (currently)
+
+Compared with upstream `main`, this fork currently includes compatibility and stability updates in `gauss_dataloader.py`:
+
+1. Replaced several `torch.tensor(...)` constructions with `torch.from_numpy(...).to("cuda:0")` to reduce unnecessary copies and enforce explicit dtype conversions.
+2. Added safer numeric handling:
+   - rotation normalization now guards against zero norm before division;
+   - `np.log(scales + 1e-10)` is used to avoid `log(0)`.
+3. Standardized float conversions (`float32/float64`) before tensor transfer to improve robustness across different inputs.
+
+### How to use in `3d_reconstruction_sdk` (submodule mode)
+
+`3DGS-to-PC` is used as a Git submodule in the SDK parent repository:
+
+```bash
+git clone --recurse-submodules git@github.com:YHZN-REPOS/3d_reconstruction_sdk.git
+cd 3d_reconstruction_sdk
+git submodule update --init --recursive
+```
+
+To update this submodule in the parent repo:
+
+```bash
+cd 3DGS-to-PC
+git checkout main
+# edit & commit
+git add -A
+git commit -m "feat: update gs2pc"
+git push origin main
+
+cd ..
+git add 3DGS-to-PC
+git commit -m "chore: bump 3DGS-to-PC submodule"
+```
+
 ## How to install
 
 Firstly, clone this repo:
 ```bash
-git clone https://github.com/Lewis-Stuart-11/3DGS-to-PC
+git clone https://github.com/YHZN-REPOS/3DGS-to-PC
 ```
+If you want to use the untouched original project, clone upstream instead:
+`https://github.com/Lewis-Stuart-11/3DGS-to-PC`
 Ensure that the original 3D Gaussian Splatting repo has been installed correctly, as this contains all required modules/packages.
 
 Next you will need to install the CUDA gaussian renderer using the following command:
@@ -47,10 +94,17 @@ The gaussian splat file can be either a .ply or .splat format.
 However, if just the input file is provided, the colours of the point cloud will not look like the original 3D gaussian splats. To generate with authentic colours, include the path to the transform file/folder:
 
 ```bash
-python gauss_to_pc.py --input_path "path//to//gaussian_splat" --transform_path "path//to//tranasforms"
+python gauss_to_pc.py --input_path "path//to//gaussian_splat" --transform_path "path//to//transforms"
 ```
 
 The transform path can either be to a transforms.json file or COLMAP output files.
+
+> If your Gaussian model was trained/exported with `sh_degree=1` (or another non-default value),
+> you should pass the matching `--max_sh_degree` when converting:
+>
+> ```bash
+> python gauss_to_pc.py --input_path "path//to//gaussian_splat" --transform_path "path//to//transforms.json" --max_sh_degree 1
+> ```
 
 ## Functionality 
 
@@ -80,7 +134,7 @@ The transform path can either be to a transforms.json file or COLMAP output file
 | mahalanobis_distance_std        | 2.0            |  Maximum Mahalanobis distance each point can be from the centre of their gaussian |
 | min_opacity                     | 0.0            |  Minimum opacity for gaussians that will be included (must be between 0-1) |
 | cull_gaussian_sizes             | 0.0            |  The percentage of gaussians to remove from largest to smallest (must be between 0-1) |
-| max_sh_degrees                  | 3              |  The number spherical harmonics of the loaded point cloud (default 3- change if different number of spherical harmonics are loaded) |
+| max_sh_degree                   | 3              |  The number spherical harmonics of the loaded point cloud (default 3- change if different number of spherical harmonics are loaded) |
 | quiet                           | False          |  Set to surpress any output print statements
 
 ## Tips
